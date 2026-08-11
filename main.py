@@ -9,7 +9,7 @@ from telegram.ext import (
     CommandHandler,
     MessageHandler,
     filters,
-    ContextTypes
+    ContextTypes,
 )
 
 # Log ayarları (Hataları ve süreçleri takip etmek için)
@@ -19,50 +19,48 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# BotFather'dan aldığınız Token'ı buraya girin
-BOT_TOKEN = "TOKEN_BURAYA"
-
+# Token'ı Railway'deki Variables kısmından güvenli bir şekilde çeker
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """/start komutu verildiğinde çalışacak karşılama mesajı."""
     user = update.effective_user
     
     welcome_text = (
-        f"✨ **Hoş Geldin, {user.first_name}!** ✨\n\n"
-        "🌐 **Web Site HTML İndirme Botu** hizmetinizdedir.\n\n"
+        f"👋 Hoş Geldin, {user.first_name}! 🤖\n\n"
+        "🌐 Web Site HTML İndirme Botu hizmetinizdedir.\n\n"
         "🚀 **Nasıl Kullanılır?**\n"
-        "İncelemek istediğiniz web sitesinin bağlantısını (`https://example.com`) "
-        "bana göndermeniz yeterlidir. Sitenin **tüm HTML kodlarını** tam kapsamlı "
-        "bir şekilde `.txt` dosyası olarak hazırlayıp size ileteceğim.\n\n"
-        "⚡ *Hazırsanız hemen bir URL gönderin!*"
+        "İncelemek istediğiniz web sitesinin bağlantısını (`https://example.com` şeklinde) "
+        "bana göndermeniz yeterlidir. Sitenin tüm HTML kodlarını tam kapsamlı bir şekilde "
+        "çekip size bir .txt dosyası olarak göndereceğim.\n\n"
+        "✨ Hemen bir bağlantı göndererek başlayabilirsiniz!"
     )
     
     await update.message.reply_text(welcome_text, parse_mode="Markdown")
 
-
 async def fetch_html(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Gönderilen URL'nin HTML kodunu çeker ve txt dosyası olarak gönderir."""
     url = update.message.text.strip()
-
+    
     # URL formatını kontrol et ve gerekirse düzenle
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
 
     # Basit bir URL doğrulama regex'i
     url_pattern = re.compile(
-        r'^(?:http|ftp)s?://'  # http:// veya https://
-        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|'  # domain...
-        r'localhost|'  # localhost...
-        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})'  # ...veya ip
-        r'(?::\d+)?'  # opsiyonel port
+        r'^(?:http|ftp)s?://' # http:// veya https://
+        r'(?:(?:[A-Z0-9](?:[A-Z0-9-]{0,61}[A-Z0-9])?\.)+(?:[A-Z]{2,6}\.?|[A-Z0-9-]{2,}\.?)|' # alan adı
+        r'localhost|' # localhost...
+        r'\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})' # veya ip
+        r'(?::\d+)?' # opsiyonel port
         r'(?:/?|[/?]\S+)$', re.IGNORECASE
     )
 
     if not url_pattern.match(url):
-        await update.message.reply_text("❌ **Geçersiz URL!** Lütfen doğru bir web adresi girdiğinizden emin olun.")
+        await update.message.reply_text("❌ Geçersiz URL! Lütfen doğru bir web adresi gönderin.", parse_mode="Markdown")
         return
 
-    status_message = await update.message.reply_text("⏳ **Web sitesinin kodları çekiliyor, lütfen bekleyin...**")
+    status_message = await update.message.reply_text("⏳ **Web sitesinin kodları çekiliyor, lütfen bekleyin...**", parse_mode="Markdown")
 
     try:
         # Gerçek bir tarayıcı gibi görünmek için User-Agent başlığı
@@ -73,11 +71,11 @@ async def fetch_html(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
                 "Chrome/120.0.0.0 Safari/537.36"
             )
         }
-        
+
         # Siteden HTML içeriğini çek
         response = requests.get(url, headers=headers, timeout=15)
         response.raise_for_status()
-        
+
         # Karakter kodlamasını otomatik tespit et
         response.encoding = response.apparent_encoding or "utf-8"
         html_content = response.text
@@ -96,12 +94,12 @@ async def fetch_html(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
             filename=filename,
             caption=(
                 f"✅ **HTML Kodları Başarıyla Çekildi!**\n\n"
-                f"🌐 **Site:** `{url}`\n"
-                f"📄 **Dosya:** `{filename}`"
+                f"🌐 Site: `{url}`\n"
+                f"📁 Dosya: `{filename}`"
             ),
             parse_mode="Markdown"
         )
-        
+
         # İşlem mesajını sil
         await status_message.delete()
 
@@ -110,11 +108,10 @@ async def fetch_html(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None
     except Exception as e:
         await status_message.edit_text(f"❌ **Beklenmeyen bir hata oluştu:**\n`{str(e)}`", parse_mode="Markdown")
 
-
 def main():
     """Botu başlatan ana fonksiyon."""
-    if BOT_TOKEN == "TOKEN_BURAYA":
-        print("HATA: Lütfen koda geçerli bir BOT_TOKEN ekleyin!")
+if not BOT_TOKEN:
+        print("HATA: BOT_TOKEN bulunamadı!")
         return
 
     # Application oluşturma
@@ -125,8 +122,8 @@ def main():
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fetch_html))
 
     print("Bot çalışıyor...")
+    # Botu sürekli aktif tutmak için polling başlat
     app.run_polling()
 
-
-if __name__ == "__main__":
+if name == "__main__":
     main()
