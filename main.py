@@ -106,5 +106,4 @@ def main():
     print("Bot çalışıyor...")
     app.run_polling()
 
-if name == "__main__":
-    main()
+main()
